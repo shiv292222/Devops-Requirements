@@ -1,0 +1,63 @@
+pipeline {
+    agent { label "dev-server" } // Specifies that the pipeline can run on the agent labeled "dev-server".
+
+    stages {
+        stage('Prepare Environment') {
+            steps {
+                // Clean up the workspace before starting the job
+                cleanWs()
+            }
+        }
+        stage('Code Clone') {
+            steps {
+                // Clone the specified Git repository into the current workspace
+                git(url: 'https://github.com/LondheShubham153/node-todo-cicd.git', branch: 'master')
+            }
+        }
+        stage('Code Build & Test') {
+            steps {
+                // Build the Docker image
+                script {
+                    try {
+                        sh 'docker build -t node-app .'
+                    } catch(Exception e) {
+                        // Handle errors gracefully
+                        echo "Error encountered during build: ${e.getMessage()}"
+                        error "Stopping the build due to build failure."
+                    }
+                }
+            }
+        }
+        stage('Push to DockerHub') {
+            steps {
+                // Log in and push the image to DockerHub
+                withCredentials([usernamePassword(credentialsId: 'dockerhubcreds', usernameVariable: 'dockerhubuser', passwordVariable: 'dockerhubpass')]) {
+                    sh "docker login -u ${env.dockerhubuser} -p ${env.dockerhubpass}"
+                    sh "docker tag node-app:latest ${env.dockerhubuser}/node-app:latest"
+                    sh "docker push ${env.dockerhubuser}/node-app:latest"
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                // Deploy the application using Docker Compose
+                sh 'docker compose down && docker compose up -d --build'
+            }
+        }
+    }
+    post {
+        always {
+            // Always perform actions no matter the build status
+            echo 'Cleaning up workspace...'
+            cleanWs()
+        }
+        success {
+            // Actions to take if the pipeline execution is successful
+            echo 'Build was successful!'
+        }
+        failure {
+            // Actions to take if the pipeline execution fails
+            echo 'Build failed!'
+        }
+    }
+}
