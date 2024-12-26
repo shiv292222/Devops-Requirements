@@ -1,0 +1,38 @@
+@Library("Shared") _
+pipeline {
+    agent { label 'dev-server' }
+    
+    stages {
+        stage('Preparing Environment') {
+            steps {
+                cleanWs()
+            }
+        }
+        stage('Code Clone') {
+            steps {
+                clone('https://github.com/LondheShubham153/node-todo-cicd.git', 'master')
+            }
+        }
+        stage('Build') {
+            steps {
+                script {
+                    try {
+                        dockerbuild('node-app', 'latest')
+                    } catch (Exception e) {
+                        echo "Error while building: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+        stage("Push To DockerHub"){
+            steps{
+                dockerpush('dockerhubcreds', 'node-app', 'latest')
+            }
+        }
+        stage("Deploy"){
+            steps{
+                deploy()
+            }
+        }
+    }
+}
